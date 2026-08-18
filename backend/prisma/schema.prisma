@@ -1,0 +1,83 @@
+generator client {
+  provider = "prisma-client-js"
+}
+
+datasource db {
+  provider = "postgresql"
+}
+
+enum UserRole {
+  ADMIN
+  USER
+}
+
+enum OrderStatus {
+  PENDING
+  COMPLETED
+  FAILED
+}
+
+enum TaskStatus {
+  PENDING
+  PROCESSING
+  COMPLETED
+  FAILED
+}
+
+model User {
+  id        String   @id @default(uuid())
+  email     String   @unique
+  name      String
+  role      UserRole @default(USER)
+  createdAt DateTime @default(now())
+  orders    Order[]
+}
+
+model InventoryItem {
+  id                String           @id @default(uuid())
+  name              String
+  sku               String           @unique
+  totalQuantity     Int
+  remainingQuantity Int
+  saleStart         DateTime
+  saleEnd           DateTime
+  isActive          Boolean          @default(true)
+  createdAt         DateTime         @default(now())
+  orders            Order[]
+  tasks             BackgroundTask[]
+
+  @@index([sku])
+  @@index([isActive])
+}
+
+model Order {
+  id              String          @id @default(uuid())
+  userId          String
+  user            User            @relation(fields: [userId], references: [id])
+  inventoryItemId String
+  inventoryItem   InventoryItem   @relation(fields: [inventoryItemId], references: [id])
+  status          OrderStatus     @default(PENDING)
+  idempotencyKey  String          @unique
+  createdAt       DateTime        @default(now())
+  task            BackgroundTask?
+
+  @@unique([userId, inventoryItemId])
+  @@index([userId])
+  @@index([inventoryItemId])
+  @@index([status])
+}
+
+model BackgroundTask {
+  id              String      @id @default(uuid())
+  orderId         String      @unique
+  order           Order       @relation(fields: [orderId], references: [id])
+  inventoryItemId String
+  inventoryItem   InventoryItem @relation(fields: [inventoryItemId], references: [id])
+  status          TaskStatus  @default(PENDING)
+  idempotencyKey  String      @unique
+  createdAt       DateTime    @default(now())
+  updatedAt       DateTime    @updatedAt
+
+  @@index([status])
+  @@index([inventoryItemId])
+}

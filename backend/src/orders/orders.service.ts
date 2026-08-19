@@ -16,6 +16,10 @@ export class OrdersService {
     private inventoryService: InventoryService,
   ) {}
 
+  async allOrder() {
+    return this.prisma.order.findMany();
+  }
+
   async findByUser(userId: string) {
     return this.prisma.order.findMany({
       where: { userId },
@@ -70,6 +74,26 @@ export class OrdersService {
 
           if (lockedItem.remainingQuantity <= 0) {
             throw new ConflictException('Out of stock');
+          }
+
+          const previousOrder = await tx.order.findFirst({
+            where: {
+              idempotencyKey: dto.idempotencyKey,
+            },
+          });
+
+          if (previousOrder) {
+            if (previousOrder.userId !== userId) {
+              throw new ConflictException('User id mismatch');
+            }
+
+            if (previousOrder.inventoryItemId !== dto.inventoryItemId) {
+              throw new ConflictException('Conflict with key');
+            }
+
+            if (previousOrder) {
+              return previousOrder;
+            }
           }
 
           await tx.inventoryItem.update({
